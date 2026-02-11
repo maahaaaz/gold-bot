@@ -47,8 +47,8 @@ async def main():
     while True:
         price = await get_gold_price()
         if price:
-            await send_message(f"💰 نرخ طلای ۱۸ عیار: {price:,} تومان")
-            print(f"✅ پیام ارسال شد: {price:,} تومان")
+            await send_message(f"💰 نرخ طلای ۱۸ عیار: {price:,} ریال")
+            print(f"✅ پیام ارسال شد: {price:,} ریال")
         else:
             print("⚠️ قیمت پیدا نشد")
         await asyncio.sleep(300)  # هر ۵ دقیقه
