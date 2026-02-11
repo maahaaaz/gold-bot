@@ -52,14 +52,23 @@ async def send_message(text):
 
 # ===================== اجرای اصلی =====================
 async def main():
+    # ارسال پیام اولیه فوری
+    price = await get_gold_price()
+    if price:
+        await send_message(f"💰 نرخ طلای ۱۸ عیار: {price:,} ریال")
+        print(f"✅ پیام ارسال شد: {price:,} ریال")
+    else:
+        print("⚠️ قیمت پیدا نشد")
+
+    # حلقه تکرار هر ۵ دقیقه
     while True:
+        await asyncio.sleep(300)  # هر ۵ دقیقه
         price = await get_gold_price()
         if price:
             await send_message(f"💰 نرخ طلای ۱۸ عیار: {price:,} ریال")
             print(f"✅ پیام ارسال شد: {price:,} ریال")
         else:
             print("⚠️ قیمت پیدا نشد")
-        await asyncio.sleep(300)  # هر ۵ دقیقه
 
 if __name__ == "__main__":
     asyncio.run(main())
