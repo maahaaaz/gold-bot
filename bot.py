@@ -1,25 +1,10 @@
 import os
-import json
 import aiohttp
 import asyncio
 import re
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
-
-DATA_FILE = "data.json"
-PRICE_THRESHOLD = 50000  # اختلاف برای هشدار شدید
-
-# ================= مدیریت فایل =================
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        return {"last_price": None}
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
-
-def save_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f)
 
 # ================= دریافت قیمت =================
 async def get_gold_price():
@@ -48,35 +33,15 @@ async def send_message(text):
 
 # ================= اجرای اصلی =================
 async def main():
-    data = load_data()
-    last_price = data.get("last_price")
-
-    new_price = await get_gold_price()
-
-    if not new_price:
-        print("Price not found")
+    price = await get_gold_price()
+    if not price:
+        print("⚠️ قیمت پیدا نشد")
         return
 
-    if not last_price:
-        data["last_price"] = new_price
-        save_data(data)
-        print("First run - price saved")
-        return
+    # پیام تست فوری — هر بار ارسال میشه
+    await send_message(f"💰 تست پیام: قیمت فعلی طلای ۱۸ عیار {price:,} تومان")
 
-    difference = abs(new_price - last_price)
-
-    # تغییر قیمت
-    if new_price != last_price:
-        await send_message(f"💰 قیمت جدید طلای ۱۸ عیار:\n{new_price:,} تومان")
-
-    # هشدار اختلاف شدید
-    if difference >= PRICE_THRESHOLD:
-        await send_message(
-            f"🚨 هشدار تغییر شدید قیمت!\nاختلاف: {difference:,} تومان"
-        )
-
-    data["last_price"] = new_price
-    save_data(data)
+    print(f"✅ پیام ارسال شد: {price:,} تومان")
 
 if __name__ == "__main__":
     asyncio.run(main())
