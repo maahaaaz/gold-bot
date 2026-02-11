@@ -1,13 +1,14 @@
 import aiohttp
 import asyncio
-from bs4 import BeautifulSoup
 from flask import Flask
 from threading import Thread
 
 # ===================== تنظیمات =====================
 BOT_TOKEN = "8400605005:AAHSCRVbw1FfQs5fPm5UKdng4N9jh6HOH0M"
-CHANNEL_ID = "@miliichanel"  # حتما @ اول باشه
-URL = "https://milli.gold/"
+CHANNEL_ID = "@miliichanel"
+
+# ⚠️ API داخلی میلی‌گلد (اینو تست کن)
+API_URL = "https://api.milli.gold/api/v1/gold"
 
 # ===================== وب سرور برای Always-On =====================
 app = Flask(__name__)
@@ -18,63 +19,45 @@ def home():
 
 Thread(target=lambda: app.run(host="0.0.0.0", port=3000)).start()
 
-# ===================== دریافت نرخ طلای ۱۸ عیار =====================
+# ===================== گرفتن نرخ واقعی =====================
 async def get_gold_price():
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(URL) as response:
-                html = await response.text()
+            async with session.get(API_URL) as response:
+                data = await response.json()
 
-        soup = BeautifulSoup(html, "html.parser")
-        
-        # پیدا کردن نرخ طلای ۱۸ عیار
-        # بررسی تمام span یا divها که شامل "18 عیار" هستند
-        price_text = None
-        for tag in soup.find_all(["span", "div"]):
-            if tag.text and "۱۸ عیار" in tag.text:
-                import re
-                match = re.search(r'(\d{1,3}(?:,\d{3})+)', tag.text)
-                if match:
-                    price_text = match.group(1)
-                    break
+        # پیدا کردن طلای 18 عیار داخل JSON
+        # ساختار احتمالی:
+        # data["data"] لیست آبجکت‌هاست
+        for item in data.get("data", []):
+            if "18" in item.get("name", ""):
+                return int(item.get("price"))
 
-        if price_text:
-            return int(price_text.replace(",", ""))
         return None
 
     except Exception as e:
-        print("Error fetching price:", e)
+        print("Error fetching API:", e)
         return None
 
-# ===================== ارسال پیام Telegram =====================
+# ===================== ارسال پیام =====================
 async def send_message(text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {"chat_id": CHANNEL_ID, "text": text}
-    try:
-        async with aiohttp.ClientSession() as session:
-            await session.post(url, data=payload)
-    except Exception as e:
-        print("Error sending message:", e)
+    async with aiohttp.ClientSession() as session:
+        await session.post(url, data=payload)
 
 # ===================== اجرای اصلی =====================
 async def main():
-    # ارسال فوری اولین پیام
-    price = await get_gold_price()
-    if price:
-        await send_message(f"💰 نرخ طلای ۱۸ عیار: {price:,} ریال")
-        print(f"✅ پیام ارسال شد: {price:,} ریال")
-    else:
-        print("⚠️ قیمت پیدا نشد")
-
-    # حلقه تکرار هر ۵ دقیقه
     while True:
-        await asyncio.sleep(300)
         price = await get_gold_price()
+
         if price:
             await send_message(f"💰 نرخ طلای ۱۸ عیار: {price:,} ریال")
-            print(f"✅ پیام ارسال شد: {price:,} ریال")
+            print("✅ ارسال شد:", price)
         else:
             print("⚠️ قیمت پیدا نشد")
+
+        await asyncio.sleep(300)  # هر ۵ دقیقه
 
 if __name__ == "__main__":
     asyncio.run(main())
