@@ -2,6 +2,8 @@ import os
 import json
 import asyncio
 import aiohttp
+from flask import Flask
+from threading import Thread
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils import executor
@@ -9,13 +11,23 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
+PORT = int(os.environ.get("PORT", 10000))
 
 DATA_FILE = "data.json"
-PRICE_THRESHOLD = 50000  # اختلاف قیمت برای هشدار فوری (تومان)
+PRICE_THRESHOLD = 50000  # اختلاف قیمت برای هشدار فوری
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(bot)
 scheduler = AsyncIOScheduler()
+app = Flask(__name__)
+
+# ================= وب سرور برای Render =================
+@app.route("/")
+def home():
+    return "Bot is alive!"
+
+def run_web():
+    app.run(host="0.0.0.0", port=PORT)
 
 # ================= مدیریت فایل =================
 def load_data():
@@ -36,12 +48,10 @@ async def get_gold_price():
             async with session.get(url) as response:
                 text = await response.text()
 
-        # این قسمت ممکنه نیاز به تنظیم دقیق داشته باشه
         import re
         match = re.search(r'(\d{1,3}(?:,\d{3})+)', text)
         if match:
-            price = int(match.group(1).replace(",", ""))
-            return price
+            return int(match.group(1).replace(",", ""))
         return None
     except:
         return None
@@ -56,7 +66,6 @@ async def check_price():
 
     last_price = data.get("last_price")
 
-    # اولین بار
     if not last_price:
         data["last_price"] = new_price
         save_data(data)
@@ -64,19 +73,18 @@ async def check_price():
 
     difference = abs(new_price - last_price)
 
-    # ارسال طبق بازه زمانی
+    # ارسال تغییر عادی
     if new_price != last_price:
         await bot.send_message(
             CHANNEL_ID,
             f"💰 قیمت جدید: {new_price:,} تومان"
         )
 
-    # هشدار فوری اختلاف زیاد
+    # هشدار اختلاف زیاد
     if difference >= PRICE_THRESHOLD:
         await bot.send_message(
             CHANNEL_ID,
-            f"🚨 هشدار تغییر شدید قیمت!\n\n"
-            f"اختلاف: {difference:,} تومان"
+            f"🚨 هشدار تغییر شدید قیمت!\nاختلاف: {difference:,} تومان"
         )
 
     data["last_price"] = new_price
@@ -111,13 +119,9 @@ async def callback_handler(callback: types.CallbackQuery):
         return
 
     interval = int(callback.data)
-    scheduler.remove_all_jobs()
 
-    scheduler.add_job(
-        check_price,
-        "interval",
-        minutes=interval
-    )
+    scheduler.remove_all_jobs()
+    scheduler.add_job(check_price, "interval", minutes=interval)
 
     data["interval"] = interval
     save_data(data)
@@ -129,11 +133,8 @@ async def on_startup(dp):
     scheduler.start()
     data = load_data()
     if data.get("interval"):
-        scheduler.add_job(
-            check_price,
-            "interval",
-            minutes=data["interval"]
-        )
+        scheduler.add_job(check_price, "interval", minutes=data["interval"])
 
 if __name__ == "__main__":
+    Thread(target=run_web).start()
     executor.start_polling(dp, skip_updates=True, on_startup=on_startup)
