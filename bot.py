@@ -3,6 +3,7 @@ import asyncio
 import re
 from flask import Flask
 from threading import Thread
+from bs4 import BeautifulSoup
 
 # ===================== تنظیمات =====================
 BOT_TOKEN = "8400605005:AAHSCRVbw1FfQs5fPm5UKdng4N9jh6HOH0M"
@@ -19,17 +20,24 @@ Thread(target=lambda: app.run(host="0.0.0.0", port=3000)).start()
 
 # ===================== دریافت نرخ طلا =====================
 async def get_gold_price():
-    url = "https://milli.gold"
+    url = "https://milli.gold/"
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 text = await response.text()
 
-        match = re.search(r'(\d{1,3}(?:,\d{3})+)', text)
-        if match:
-            return int(match.group(1).replace(",", ""))
+        soup = BeautifulSoup(text, "html.parser")
+
+        # پیدا کردن بخش قیمت طلای 18 عیار
+        price_tag = soup.find("div", string=lambda s: s and "قیمت" in s and "۱۸ عیار" in s)
+        if price_tag:
+            match = re.search(r'(\d{1,3}(?:,\d{3})+)', price_tag.text)
+            if match:
+                return int(match.group(1).replace(",", ""))
+
         return None
-    except:
+    except Exception as e:
+        print("Error parsing price:", e)
         return None
 
 # ===================== ارسال پیام =====================
