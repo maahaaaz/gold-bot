@@ -1,12 +1,23 @@
-import os
 import aiohttp
 import asyncio
 import re
+from flask import Flask
+from threading import Thread
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID")
+# ===================== تنظیمات =====================
+BOT_TOKEN = "8400605005:AAHSCRVbw1FfQs5fPm5UKdng4N9jh6HOH0M"
+CHANNEL_ID = "@miliichanel"  # حتما @ اول باشه
 
-# ================= دریافت قیمت =================
+# ===================== وب سرور برای Always-On =====================
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Bot is alive!"
+
+Thread(target=lambda: app.run(host="0.0.0.0", port=3000)).start()
+
+# ===================== دریافت نرخ طلا =====================
 async def get_gold_price():
     url = "https://milli.gold"
     try:
@@ -21,7 +32,7 @@ async def get_gold_price():
     except:
         return None
 
-# ================= ارسال پیام =================
+# ===================== ارسال پیام =====================
 async def send_message(text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {
@@ -31,16 +42,16 @@ async def send_message(text):
     async with aiohttp.ClientSession() as session:
         await session.post(url, data=payload)
 
-# ================= اجرای اصلی =================
+# ===================== اجرای اصلی =====================
 async def main():
-    price = await get_gold_price()
-    if not price:
-        print("⚠️ قیمت پیدا نشد")
-        return
-
-    # پیام هر بار ارسال می‌شود
-    await send_message(f"💰 نرخ طلای ۱۸ عیار: {price:,} تومان")
-    print(f"✅ پیام ارسال شد: {price:,} تومان")
+    while True:
+        price = await get_gold_price()
+        if price:
+            await send_message(f"💰 نرخ طلای ۱۸ عیار: {price:,} تومان")
+            print(f"✅ پیام ارسال شد: {price:,} تومان")
+        else:
+            print("⚠️ قیمت پیدا نشد")
+        await asyncio.sleep(300)  # هر ۵ دقیقه
 
 if __name__ == "__main__":
     asyncio.run(main())
